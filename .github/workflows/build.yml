@@ -2,10 +2,15 @@ name: Build ASK Driver
 on: [push, workflow_dispatch]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
     
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bison flex libelf-dev bc
+        
     - name: Setup Kernel Source
       run: |
         git clone --depth 1 -b android12-5.10 https://mirrors.bfsu.edu.cn/git/AOSP/kernel/common.git kernel
@@ -15,6 +20,7 @@ jobs:
         cd kernel
         export ARCH=arm64
         export SUBARCH=arm64
+        sed -i 's/bcmp/memcmp/g' scripts/kconfig/confdata.c
         make CC=clang gki_defconfig
         make CC=clang -j2 modules_prepare
         
@@ -27,3 +33,4 @@ jobs:
       with:
         name: ask_rw_module
         path: ask_rw.ko
+        
