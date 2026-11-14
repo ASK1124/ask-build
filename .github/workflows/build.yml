@@ -1,0 +1,29 @@
+name: Build ASK Driver
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Kernel Source
+      run: |
+        git clone --depth 1 -b android12-5.10 https://mirrors.bfsu.edu.cn/git/AOSP/kernel/common.git kernel
+        
+    - name: Prepare Kernel
+      run: |
+        cd kernel
+        export ARCH=arm64
+        export SUBARCH=arm64
+        make CC=clang gki_defconfig
+        make CC=clang -j2 modules_prepare
+        
+    - name: Build Module
+      run: |
+        make -C kernel M=${{ github.workspace }} ARCH=arm64 CC=clang modules
+        
+    - name: Upload Module
+      uses: actions/upload-artifact@v4
+      with:
+        name: ask_rw_module
+        path: ask_rw.ko
