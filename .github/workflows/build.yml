@@ -9,7 +9,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y bison flex libelf-dev bc
+        sudo apt-get install -y bison flex libelf-dev libssl-dev bc
         
     - name: Setup Kernel Source
       run: |
@@ -20,8 +20,11 @@ jobs:
         cd kernel
         export ARCH=arm64
         export SUBARCH=arm64
+        # 修复老内核 bcmp 报错
         sed -i 's/bcmp/memcmp/g' scripts/kconfig/confdata.c
         make CC=clang gki_defconfig
+        # 强制关闭 BTF 调试信息（云端编译 5.10 必做，否则必报错）
+        sed -i 's/CONFIG_DEBUG_INFO_BTF=y/# CONFIG_DEBUG_INFO_BTF is not set/' .config
         make CC=clang -j2 modules_prepare
         
     - name: Build Module
@@ -33,4 +36,3 @@ jobs:
       with:
         name: ask_rw_module
         path: ask_rw.ko
-        
