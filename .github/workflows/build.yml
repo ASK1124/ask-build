@@ -4,12 +4,19 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Install Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y bison flex libelf-dev libssl-dev bc
+        
+    - name: Download AOSP Clang Toolchain
+      run: |
+        wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r416183b.tar.gz
+        mkdir clang
+        tar -xzf clang-r416183b.tar.gz -C clang
+        rm clang-r416183b.tar.gz
         
     - name: Setup Kernel Source
       run: |
@@ -20,16 +27,23 @@ jobs:
         cd kernel
         export ARCH=arm64
         export SUBARCH=arm64
-        # 修复老内核 bcmp 报错
         sed -i 's/bcmp/memcmp/g' scripts/kconfig/confdata.c
-        make CC=clang gki_defconfig
-        # 强制关闭 BTF 调试信息（云端编译 5.10 必做，否则必报错）
+        
+        # 指向刚才下载的官方 clang
+        export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export CLANG_TRIPLE=aarch64-linux-gnu-
+        
+        make CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 gki_defconfig
         sed -i 's/CONFIG_DEBUG_INFO_BTF=y/# CONFIG_DEBUG_INFO_BTF is not set/' .config
-        make CC=clang -j2 modules_prepare
+        make CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 -j2 modules_prepare
         
     - name: Build Module
       run: |
-        make -C kernel M=${{ github.workspace }} ARCH=arm64 CC=clang modules
+        export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export CLANG_TRIPLE=aarch64-linux-gnu-
+        make -C kernel M=${{ github.workspace }} ARCH=arm64 CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 modules
         
     - name: Upload Module
       uses: actions/upload-artifact@v4
